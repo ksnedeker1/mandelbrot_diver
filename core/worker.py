@@ -21,9 +21,14 @@ class MandelbrotWorker(QRunnable):
         self.x_width = x_width
         self.max_iter = max_iter
         self.worker = MandelbrotWorkerSignalHandler()
+        self.stop_requested = False
 
     def run(self):
         iteration_data = compute_mandelbrot(
-            self.width, self.height, self.x_center, self.y_center, self.x_width, self.max_iter
+            self.width, self.height, self.x_center, self.y_center, self.x_width, max_iter=self.max_iter, worker=self
         )
-        self.worker.SIG_FINISHED.emit(iteration_data, self.chunk_coords)
+        if not self.stop_requested:
+            self.worker.SIG_FINISHED.emit(iteration_data, self.chunk_coords)
+
+    def stop(self):
+        self.stop_requested = True
