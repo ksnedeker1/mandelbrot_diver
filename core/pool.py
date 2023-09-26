@@ -19,6 +19,7 @@ class MandelbrotPoolManager(QtCore.QObject):
         self.max_iter = max_iter
 
         self.thread_pool = QtCore.QThreadPool()
+        self.workers = []
         self.mandelbrot_data = np.zeros((height, width), dtype=int)
 
     def _on_worker_finished(self, data, coords):
@@ -27,8 +28,18 @@ class MandelbrotPoolManager(QtCore.QObject):
         self.mandelbrot_data[y_start:y_start + data.shape[0], x_start:x_start + data.shape[1]] = data
         self.SIG_CHUNK_FINISHED.emit(self.mandelbrot_data, coords)
 
+    def restart_computation(self, x_center, y_center, x_width):
+        """Abandon current work and restart with updated params"""
+        self.halt_workers()
+        self.x_center = x_center
+        self.y_center = y_center
+        self.x_width = x_width
+        self.start_computation()
+
     def start_computation(self, chunk_size=200):
         """Partition display area into chunks, deduce params, spawn worker."""
+        self.halt_workers()
+
         # Re/Im increment per px
         x_increment = self.x_width / self.width
         y_increment = (self.x_width * self.height / self.width) / self.height
@@ -44,8 +55,14 @@ class MandelbrotPoolManager(QtCore.QObject):
                 # Spawn worker
                 task = MandelbrotWorker((x, y), width, height, chunk_x_center, chunk_y_center, chunk_x_width,
                                         self.max_iter)
+                self.workers.append(task)
                 task.worker.SIG_FINISHED.connect(self._on_worker_finished)
                 self.thread_pool.start(task)
+
+    def halt_workers(self):
+        for worker in self.workers:
+            worker.stop()
+        self.workers = []
 
     def get_result(self):
         return self.mandelbrot_data
