@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def compute_mandelbrot(width, height, x_center, y_center, x_width, max_iter=1000):
+def compute_mandelbrot(width, height, x_center, y_center, x_width, max_iter=1000, worker=None):
     """
     Compute the Mandelbrot set for a sector.
 
@@ -10,6 +10,7 @@ def compute_mandelbrot(width, height, x_center, y_center, x_width, max_iter=1000
     - x_center, y_center: center point of the view in the complex plane in Re, Im.
     - x_width: width of the view in the complex plane in Re.
     - max_iter: the max iteration depth for divergence.
+    - worker: instance of the caller worker, used to handle halt requests.
 
     Return: 2D array of iteration counts, shape (width, height).
     """
@@ -25,6 +26,9 @@ def compute_mandelbrot(width, height, x_center, y_center, x_width, max_iter=1000
     z = np.zeros_like(c)
     iteration = np.zeros_like(c, dtype=int)
     for i in range(max_iter):
+        # Accommodate stop requests
+        if worker is not None and worker.stop_requested:
+            return None
         not_diverged = np.abs(z) <= 2
         iteration[not_diverged] = i
         z[not_diverged] = z[not_diverged]**2 + c[not_diverged]
