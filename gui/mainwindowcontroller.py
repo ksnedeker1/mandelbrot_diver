@@ -17,12 +17,47 @@ class MainWindowController(QtWidgets.QMainWindow, Ui_MainWindow):
             self.setStyleSheet(f.read())
 
         self.color_scheme = "ramp"
+        self.prev_x_center = 0
+        self.prev_y_center = 0
+        self.prev_x_width = 3.5
+        self.width = 800
+        self.height = 600
         self.max_iter = 200
 
-        self.pool_manager = MandelbrotPoolManager(800, 600, 0, 0, 3.5, max_iter=self.max_iter)
+        self.x_scale = self.prev_x_width / self.width
+        self.y_scale = (self.prev_x_width * self.height / self.width) / self.height
+
+        self.pool_manager = MandelbrotPoolManager(
+            self.width, self.height, self.prev_x_center,
+            self.prev_y_center, self.prev_x_width, max_iter=self.max_iter
+        )
         self.pool_manager.SIG_CHUNK_FINISHED.connect(self.update_view)
 
-        self.test()
+        self.viewGraphics.SIG_UPDATE_BOUNDS.connect(self.on_updated_view)
+
+        self.start()
+
+    def on_updated_view(self, factor, cursor_position):
+        """Translate event data, update params, restart generation."""
+        prev_y_width = self.prev_x_width * self.height / self.width
+
+        # Convert cursor position in px to Re/Im coord in set
+        cursor_x = self.prev_x_center + (cursor_position.x() - self.width / 2) * (self.prev_x_width / self.width)
+        cursor_y = self.prev_y_center + (cursor_position.y() - self.height / 2) * (prev_y_width / self.height)
+        # Distance to current center
+        x_offset = cursor_x - self.prev_x_center
+        y_offset = cursor_y - self.prev_y_center
+        # Scale width and adjust center (maintains the position of the coord under the cursor)
+        x_width = self.prev_x_width / factor
+        x_center = self.prev_x_center + x_offset * (1 - 1 / factor)
+        y_center = self.prev_y_center + y_offset * (1 - 1 / factor)
+
+        self.prev_x_center = x_center
+        self.prev_y_center = y_center
+        self.prev_x_width = x_width
+        self.x_scale = x_width / self.width
+
+        self.pool_manager.restart_computation(x_center, y_center, x_width)
 
     def update_view(self):
         """Fetches current state of the rendered array"""
@@ -64,7 +99,7 @@ class MainWindowController(QtWidgets.QMainWindow, Ui_MainWindow):
         self.viewGraphics.setScene(scene)
         self.viewGraphics.show()
 
-    def test(self):
+    def start(self):
         self.pool_manager.start_computation()
 
 
